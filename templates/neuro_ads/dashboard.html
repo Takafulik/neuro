@@ -1,0 +1,334 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Neuro-Ads Engine - AI-Powered Campaigns{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 15px;
+        padding: 1.5rem;
+        color: white;
+        transition: transform 0.3s ease;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+    
+    .metric-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    
+    .campaign-card {
+        border: 1px solid #e3e6f0;
+        border-radius: 10px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .campaign-card:hover {
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    
+    .status-active {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .status-paused {
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .status-draft {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+    
+    .ai-indicator {
+        background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 15px;
+        font-size: 0.7rem;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0 text-gray-800">
+                        <i class="fas fa-robot text-primary mr-2"></i>
+                        Neuro-Ads Engine
+                    </h1>
+                    <p class="text-muted">AI-Powered Autonomous Campaign Management</p>
+                </div>
+                <div>
+                    <a href="{% url 'neuro_ads:create_campaign' %}" class="btn btn-primary">
+                        <i class="fas fa-plus mr-2"></i>Create AI Campaign
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="metric-card">
+                <div class="metric-value">${{ summary_metrics.total_spend|floatformat:0 }}</div>
+                <div class="metric-label">Total Ad Spend (30d)</div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="metric-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="metric-value">${{ summary_metrics.total_revenue|floatformat:0 }}</div>
+                <div class="metric-label">Revenue Generated</div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="metric-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <div class="metric-value">{{ summary_metrics.roas|floatformat:1 }}x</div>
+                <div class="metric-label">Return on Ad Spend</div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="metric-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                <div class="metric-value">{{ summary_metrics.total_conversions }}</div>
+                <div class="metric-label">Total Conversions</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Stats -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Active Campaigns
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_campaigns }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-bullhorn fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                A/B Tests Running
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ active_ab_tests }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-vial fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Connected Platforms
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ connected_platforms }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-network-wired fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Avg. CTR
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ summary_metrics.ctr|floatformat:2 }}%</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-mouse-pointer fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Campaigns & Quick Actions -->
+    <div class="row">
+        <!-- Recent Campaigns -->
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Recent AI Campaigns</h6>
+                    <a href="{% url 'neuro_ads:campaigns' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body">
+                    {% if campaigns %}
+                        {% for campaign in campaigns %}
+                        <div class="campaign-card">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">
+                                        <a href="{% url 'neuro_ads:campaign_detail' campaign.id %}" 
+                                           class="text-decoration-none">{{ campaign.name }}</a>
+                                        <span class="ai-indicator ml-2">AI</span>
+                                    </h6>
+                                    <p class="text-muted small mb-2">{{ campaign.description|truncatechars:80 }}</p>
+                                    <div class="d-flex align-items-center">
+                                        <span class="status-badge status-{{ campaign.status }}">
+                                            {{ campaign.get_status_display }}
+                                        </span>
+                                        <span class="text-muted small ml-3">
+                                            <i class="fas fa-calendar mr-1"></i>
+                                            {{ campaign.created_at|date:"M d, Y" }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-primary font-weight-bold">${{ campaign.total_budget|floatformat:0 }}</div>
+                                    <div class="text-muted small">Budget</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-robot fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No campaigns yet</h5>
+                            <p class="text-muted">Create your first AI-powered campaign to get started</p>
+                            <a href="{% url 'neuro_ads:create_campaign' %}" class="btn btn-primary">
+                                <i class="fas fa-plus mr-2"></i>Create Campaign
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions & AI Features -->
+        <div class="col-lg-4 mb-4">
+            <!-- AI Features -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-brain mr-2"></i>AI Features
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-magic text-success mr-2"></i>
+                            <strong>Autonomous Campaigns</strong>
+                        </div>
+                        <p class="text-muted small">AI generates and optimizes campaigns across Google, Meta, and LinkedIn automatically.</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-chart-line text-info mr-2"></i>
+                            <strong>Budget Optimization</strong>
+                        </div>
+                        <p class="text-muted small">Real-time budget allocation based on performance metrics and ML predictions.</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-vials text-warning mr-2"></i>
+                            <strong>Auto A/B Testing</strong>
+                        </div>
+                        <p class="text-muted small">Continuous testing of ad copy and creatives with statistical significance.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Quick Actions</h6>
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'neuro_ads:create_campaign' %}" class="btn btn-primary btn-block mb-2">
+                        <i class="fas fa-plus mr-2"></i>Create AI Campaign
+                    </a>
+                    <a href="{% url 'neuro_ads:ab_tests' %}" class="btn btn-outline-success btn-block mb-2">
+                        <i class="fas fa-vial mr-2"></i>View A/B Tests
+                    </a>
+                    <a href="{% url 'neuro_ads:analytics_dashboard' %}" class="btn btn-outline-info btn-block mb-2">
+                        <i class="fas fa-chart-bar mr-2"></i>Analytics Dashboard
+                    </a>
+                    <a href="{% url 'neuro_ads:platform_connections' %}" class="btn btn-outline-warning btn-block mb-2">
+                        <i class="fas fa-plug mr-2"></i>Platform Settings
+                    </a>
+                    <a href="{% url 'neuro_ads:automation_rules' %}" class="btn btn-outline-secondary btn-block">
+                        <i class="fas fa-cogs mr-2"></i>Automation Rules
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Add any dashboard-specific JavaScript here
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize tooltips
+        $('[data-toggle="tooltip"]').tooltip();
+        
+        // Add smooth animations
+        $('.metric-card').hover(
+            function() { $(this).addClass('shadow-lg'); },
+            function() { $(this).removeClass('shadow-lg'); }
+        );
+    });
+</script>
+{% endblock %}

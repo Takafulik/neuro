@@ -1,0 +1,474 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}A/B Testing - Neuro-Ads{% endblock %}
+
+{% block extra_head %}
+<style>
+    .test-card {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+        transition: all 0.3s ease;
+        margin-bottom: 1.5rem;
+    }
+    
+    .test-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 0.25rem 2rem 0 rgba(58, 59, 69, 0.25);
+    }
+    
+    .variant-card {
+        border: 2px solid #e3e6f0;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .variant-card.winner {
+        border-color: #1cc88a;
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    }
+    
+    .variant-card.loser {
+        border-color: #e74a3b;
+        background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+    }
+    
+    .confidence-meter {
+        height: 8px;
+        background: #e3e6f0;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    
+    .confidence-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.5s ease;
+    }
+    
+    .confidence-low { background: #e74a3b; }
+    .confidence-medium { background: #f6c23e; }
+    .confidence-high { background: #1cc88a; }
+    
+    .status-badge {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+    }
+    
+    .status-running { background: #cce7ff; color: #004085; }
+    .status-completed { background: #d4edda; color: #155724; }
+    .status-paused { background: #fff3cd; color: #856404; }
+    .status-draft { background: #e2e3e5; color: #383d41; }
+    
+    .metric-comparison {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #e3e6f0;
+    }
+    
+    .metric-comparison:last-child {
+        border-bottom: none;
+    }
+    
+    .statistical-significance {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+    
+    .ai-recommendation {
+        background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h3 mb-0 text-gray-800">
+                        <i class="fas fa-vials text-primary mr-2"></i>
+                        A/B Testing Dashboard
+                    </h1>
+                    <p class="text-muted">AI-powered split testing with statistical analysis</p>
+                </div>
+                <div>
+                    <button class="btn btn-primary" data-toggle="modal" data-target="#createTestModal">
+                        <i class="fas fa-plus mr-1"></i>Create New Test
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-left-primary h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Active Tests
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ stats.active_tests }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-play fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-left-success h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Completed Tests
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ stats.completed_tests }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-left-info h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Avg. Confidence
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ stats.avg_confidence|floatformat:1 }}%
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-left-warning h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Avg. Uplift
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                +{{ stats.avg_uplift|floatformat:1 }}%
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-arrow-up fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <ul class="nav nav-pills" id="testTabs" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" id="all-tab" data-toggle="pill" href="#all" role="tab">
+                        All Tests ({{ ab_tests.count }})
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="running-tab" data-toggle="pill" href="#running" role="tab">
+                        Running ({{ running_tests.count }})
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="completed-tab" data-toggle="pill" href="#completed" role="tab">
+                        Completed ({{ completed_tests.count }})
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="significant-tab" data-toggle="pill" href="#significant" role="tab">
+                        Significant Results ({{ significant_tests.count }})
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Test Results -->
+    <div class="tab-content" id="testTabContent">
+        <div class="tab-pane fade show active" id="all" role="tabpanel">
+            {% for test in ab_tests %}
+                {% include 'neuro_ads/partials/ab_test_card.html' %}
+            {% empty %}
+                <div class="text-center py-5">
+                    <i class="fas fa-vials fa-3x text-gray-300 mb-3"></i>
+                    <h5 class="text-gray-600">No A/B tests found</h5>
+                    <p class="text-muted">Create your first test to start optimizing your campaigns</p>
+                    <button class="btn btn-primary" data-toggle="modal" data-target="#createTestModal">
+                        <i class="fas fa-plus mr-1"></i>Create Test
+                    </button>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="tab-pane fade" id="running" role="tabpanel">
+            {% for test in running_tests %}
+                {% include 'neuro_ads/partials/ab_test_card.html' %}
+            {% empty %}
+                <div class="text-center py-5">
+                    <i class="fas fa-play fa-3x text-gray-300 mb-3"></i>
+                    <h5 class="text-gray-600">No running tests</h5>
+                    <p class="text-muted">All tests are either completed or paused</p>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="tab-pane fade" id="completed" role="tabpanel">
+            {% for test in completed_tests %}
+                {% include 'neuro_ads/partials/ab_test_card.html' %}
+            {% empty %}
+                <div class="text-center py-5">
+                    <i class="fas fa-check fa-3x text-gray-300 mb-3"></i>
+                    <h5 class="text-gray-600">No completed tests</h5>
+                    <p class="text-muted">Tests that reach statistical significance will appear here</p>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="tab-pane fade" id="significant" role="tabpanel">
+            {% for test in significant_tests %}
+                {% include 'neuro_ads/partials/ab_test_card.html' %}
+            {% empty %}
+                <div class="text-center py-5">
+                    <i class="fas fa-chart-line fa-3x text-gray-300 mb-3"></i>
+                    <h5 class="text-gray-600">No statistically significant results yet</h5>
+                    <p class="text-muted">Keep running tests to gather meaningful data</p>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Create Test Modal -->
+<div class="modal fade" id="createTestModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-vials mr-2"></i>
+                    Create New A/B Test
+                </h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <form method="post" id="createTestForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="test_name">Test Name *</label>
+                        <input type="text" class="form-control" id="test_name" name="test_name" 
+                               placeholder="e.g., Headline Variation Test" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="campaign">Campaign *</label>
+                        <select class="form-control" id="campaign" name="campaign" required>
+                            <option value="">Select Campaign...</option>
+                            {% for campaign in campaigns %}
+                            <option value="{{ campaign.id }}">{{ campaign.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="test_type">Test Type *</label>
+                        <select class="form-control" id="test_type" name="test_type" required>
+                            <option value="">Select Type...</option>
+                            <option value="headline">Headline Variation</option>
+                            <option value="description">Description Variation</option>
+                            <option value="creative">Creative/Image Variation</option>
+                            <option value="cta">Call-to-Action Variation</option>
+                            <option value="landing_page">Landing Page Variation</option>
+                            <option value="audience">Audience Variation</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="primary_metric">Primary Metric *</label>
+                        <select class="form-control" id="primary_metric" name="primary_metric" required>
+                            <option value="">Select Metric...</option>
+                            <option value="ctr">Click-Through Rate (CTR)</option>
+                            <option value="cvr">Conversion Rate</option>
+                            <option value="cpc">Cost Per Click</option>
+                            <option value="cpa">Cost Per Acquisition</option>
+                            <option value="roas">Return on Ad Spend</option>
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="traffic_split">Traffic Split (%)</label>
+                                <input type="number" class="form-control" id="traffic_split" 
+                                       name="traffic_split" value="50" min="10" max="90">
+                                <small class="form-text text-muted">Percentage of traffic for variant B</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="min_sample_size">Minimum Sample Size</label>
+                                <input type="number" class="form-control" id="min_sample_size" 
+                                       name="min_sample_size" value="1000" min="100">
+                                <small class="form-text text-muted">Minimum conversions before declaring winner</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="auto_winner" name="auto_winner" checked>
+                        <label class="form-check-label" for="auto_winner">
+                            Automatically apply winning variant when statistically significant
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-vials mr-1"></i>Create Test
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle test actions
+    document.querySelectorAll('.pause-test').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const testId = this.dataset.testId;
+            if (confirm('Are you sure you want to pause this test?')) {
+                pauseTest(testId);
+            }
+        });
+    });
+
+    document.querySelectorAll('.stop-test').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const testId = this.dataset.testId;
+            if (confirm('Are you sure you want to stop this test and apply the winner?')) {
+                stopTest(testId);
+            }
+        });
+    });
+
+    // Create test form submission
+    document.getElementById('createTestForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        
+        fetch('{% url "neuro_ads:create_ab_test" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                $('#createTestModal').modal('hide');
+                location.reload();
+            } else {
+                alert('Error creating test: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error creating test');
+        });
+    });
+});
+
+function pauseTest(testId) {
+    fetch(`/neuro-ads/ab-tests/${testId}/pause/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error pausing test: ' + data.error);
+        }
+    });
+}
+
+function stopTest(testId) {
+    fetch(`/neuro-ads/ab-tests/${testId}/stop/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Test stopped and winning variant applied!');
+            location.reload();
+        } else {
+            alert('Error stopping test: ' + data.error);
+        }
+    });
+}
+
+function viewTestDetails(testId) {
+    window.location.href = `/neuro-ads/ab-tests/${testId}/`;
+}
+</script>
+{% endblock %}

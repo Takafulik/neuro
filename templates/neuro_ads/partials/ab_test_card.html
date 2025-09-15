@@ -1,0 +1,194 @@
+<!-- A/B Test Card Partial Template -->
+<div class="test-card">
+    <div class="card">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-0 font-weight-bold">{{ test.name }}</h6>
+                    <small class="text-muted">{{ test.campaign.name }}</small>
+                </div>
+                <div class="d-flex align-items-center">
+                    <span class="status-badge status-{{ test.status|lower }} mr-2">
+                        {{ test.get_status_display }}
+                    </span>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-toggle="dropdown">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <div class="dropdown-menu">
+                            <a class="dropdown-item" href="{% url 'neuro_ads:ab_test_detail' test.id %}">
+                                <i class="fas fa-eye mr-2"></i>View Details
+                            </a>
+                            {% if test.status == 'running' %}
+                            <a class="dropdown-item pause-test" href="#" data-test-id="{{ test.id }}">
+                                <i class="fas fa-pause mr-2"></i>Pause Test
+                            </a>
+                            <a class="dropdown-item stop-test" href="#" data-test-id="{{ test.id }}">
+                                <i class="fas fa-stop mr-2"></i>Stop & Apply Winner
+                            </a>
+                            {% endif %}
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item text-danger" href="#" onclick="deleteTest({{ test.id }})">
+                                <i class="fas fa-trash mr-2"></i>Delete
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Test Info -->
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between small">
+                        <span><strong>Test Type:</strong></span>
+                        <span>{{ test.get_test_type_display }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span><strong>Primary Metric:</strong></span>
+                        <span>{{ test.get_primary_metric_display }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span><strong>Started:</strong></span>
+                        <span>{{ test.start_date|date:"M d, Y" }}</span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between small">
+                        <span><strong>Sample Size:</strong></span>
+                        <span>{{ test.total_samples|default:"0" }} / {{ test.min_sample_size }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span><strong>Traffic Split:</strong></span>
+                        <span>{{ test.traffic_split_percentage }}% / {{ 100|add:test.traffic_split_percentage|add:"-100"|abs }}%</span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span><strong>Duration:</strong></span>
+                        <span>{{ test.days_running }} days</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistical Significance -->
+            {% if test.confidence_level %}
+            <div class="statistical-significance">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="font-weight-bold">Statistical Confidence</span>
+                    <span class="h5 mb-0">{{ test.confidence_level|floatformat:1 }}%</span>
+                </div>
+                <div class="confidence-meter">
+                    <div class="confidence-fill {% if test.confidence_level >= 95 %}confidence-high{% elif test.confidence_level >= 80 %}confidence-medium{% else %}confidence-low{% endif %}" 
+                         style="width: {{ test.confidence_level }}%"></div>
+                </div>
+                <div class="small mt-1">
+                    {% if test.confidence_level >= 95 %}
+                        <i class="fas fa-check mr-1"></i>Statistically significant - safe to apply winner
+                    {% elif test.confidence_level >= 80 %}
+                        <i class="fas fa-clock mr-1"></i>Approaching significance - continue testing
+                    {% else %}
+                        <i class="fas fa-hourglass mr-1"></i>Collecting data - need more samples
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Variants Comparison -->
+            <div class="row">
+                {% for variant in test.variants.all %}
+                <div class="col-md-6">
+                    <div class="variant-card {% if variant == test.winning_variant %}winner{% elif test.winning_variant and variant != test.winning_variant and test.confidence_level >= 95 %}loser{% endif %}">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="mb-1">
+                                    {{ variant.name }}
+                                    {% if variant == test.winning_variant %}
+                                        <i class="fas fa-crown text-warning ml-1" title="Current Winner"></i>
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">{{ variant.description|truncatewords:10 }}</small>
+                            </div>
+                            {% if variant.is_control %}
+                                <span class="badge badge-secondary">Control</span>
+                            {% else %}
+                                <span class="badge badge-primary">Variant</span>
+                            {% endif %}
+                        </div>
+
+                        <!-- Variant Metrics -->
+                        <div class="metric-comparison">
+                            <span class="small">Impressions:</span>
+                            <span class="font-weight-bold">{{ variant.impressions|default:0|floatformat:0 }}</span>
+                        </div>
+                        
+                        <div class="metric-comparison">
+                            <span class="small">Clicks:</span>
+                            <span class="font-weight-bold">{{ variant.clicks|default:0|floatformat:0 }}</span>
+                        </div>
+                        
+                        <div class="metric-comparison">
+                            <span class="small">CTR:</span>
+                            <span class="font-weight-bold {% if variant.ctr > test.control_variant.ctr %}text-success{% elif variant.ctr < test.control_variant.ctr %}text-danger{% endif %}">
+                                {{ variant.ctr|default:0|floatformat:2 }}%
+                                {% if variant != test.control_variant and test.control_variant.ctr %}
+                                    {% with uplift=variant.ctr|sub:test.control_variant.ctr|div:test.control_variant.ctr|mul:100 %}
+                                        {% if uplift > 0 %}
+                                            <small class="text-success">(+{{ uplift|floatformat:1 }}%)</small>
+                                        {% elif uplift < 0 %}
+                                            <small class="text-danger">({{ uplift|floatformat:1 }}%)</small>
+                                        {% endif %}
+                                    {% endwith %}
+                                {% endif %}
+                            </span>
+                        </div>
+                        
+                        <div class="metric-comparison">
+                            <span class="small">Conversions:</span>
+                            <span class="font-weight-bold">{{ variant.conversions|default:0|floatformat:0 }}</span>
+                        </div>
+                        
+                        <div class="metric-comparison">
+                            <span class="small">CVR:</span>
+                            <span class="font-weight-bold {% if variant.conversion_rate > test.control_variant.conversion_rate %}text-success{% elif variant.conversion_rate < test.control_variant.conversion_rate %}text-danger{% endif %}">
+                                {{ variant.conversion_rate|default:0|floatformat:2 }}%
+                                {% if variant != test.control_variant and test.control_variant.conversion_rate %}
+                                    {% with uplift=variant.conversion_rate|sub:test.control_variant.conversion_rate|div:test.control_variant.conversion_rate|mul:100 %}
+                                        {% if uplift > 0 %}
+                                            <small class="text-success">(+{{ uplift|floatformat:1 }}%)</small>
+                                        {% elif uplift < 0 %}
+                                            <small class="text-danger">({{ uplift|floatformat:1 }}%)</small>
+                                        {% endif %}
+                                    {% endwith %}
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- AI Recommendation -->
+            {% if test.ai_recommendation %}
+            <div class="ai-recommendation">
+                <h6 class="mb-2">
+                    <i class="fas fa-brain mr-2"></i>
+                    AI Recommendation
+                </h6>
+                <p class="mb-0 small">{{ test.ai_recommendation }}</p>
+            </div>
+            {% endif %}
+
+            <!-- Action Buttons -->
+            <div class="text-center mt-3">
+                <button class="btn btn-sm btn-outline-primary" onclick="viewTestDetails({{ test.id }})">
+                    <i class="fas fa-chart-bar mr-1"></i>View Full Analysis
+                </button>
+                
+                {% if test.status == 'running' and test.confidence_level >= 95 %}
+                <button class="btn btn-sm btn-success stop-test" data-test-id="{{ test.id }}">
+                    <i class="fas fa-trophy mr-1"></i>Apply Winner
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
